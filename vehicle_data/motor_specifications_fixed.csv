@@ -1,0 +1,10 @@
+trim,parameter,value,unit,source,drivetrain
+Long_Range_2WD,max_power_kw,168,kW,Hyundai_Official,2WD
+Long_Range_AWD,max_power_kw,239,kW,Hyundai_Official,AWD
+Standard_2WD,max_power_kw,125,kW,Estimated,2WD
+Long_Range_2WD,max_torque_nm,350,Nm,Calculated,2WD
+Long_Range_AWD,max_torque_nm,605,Nm,Calculated,AWD
+Standard_2WD,max_torque_nm,350,Nm,Calculated,2WD
+Long_Range_2WD,max_rpm,4600,rpm,Hyundai_Official,2WD
+Long_Range_AWD,max_rpm,4600,rpm,Hyundai_Official,AWD
+Standard_2WD,max_rpm,3600,rpm,Estimated,2WD

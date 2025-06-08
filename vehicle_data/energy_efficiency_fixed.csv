@@ -1,0 +1,8 @@
+condition,value,unit,min_value,max_value,source,test_condition
+Combined,4.85,km_per_kWh,4.5,5.2,Danawa_Official,WLTP
+Urban,4.9,km_per_kWh,4.8,5.2,Estimated,City_Driving
+Highway,4.3,km_per_kWh,4.1,4.5,Estimated,Highway_95kmh
+Range_Long_Range,458.0,km,400.0,485.0,Multiple_Sources,Optimal_Condition
+Range_Standard,319.0,km,280.0,350.0,Multiple_Sources,Optimal_Condition
+Fast_Charge_10_80,18.0,min,16.0,20.0,Hyundai_Official,220kW_Charger
+Fast_Charge_5min_Range,100.0,km,90.0,110.0,Hyundai_Official,220kW_Charger

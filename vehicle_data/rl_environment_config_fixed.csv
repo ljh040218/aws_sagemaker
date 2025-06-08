@@ -1,0 +1,13 @@
+parameter_type,value,unit,description,algorithm_applicability
+state_dimension,8.0,dimensions,State_vector_dimensions_SOC_temp_speed_etc,DDPG_SAC
+action_min,-3.0,m_per_s2,Minimum_acceleration_strong_deceleration,DDPG_SAC
+action_max,3.0,m_per_s2,Maximum_acceleration_strong_acceleration,DDPG_SAC
+reward_weight_energy,0.6,weight,Weight_for_energy_efficiency_in_reward_function,DDPG_SAC
+reward_weight_speed,0.3,weight,Weight_for_speed_tracking_in_reward_function,DDPG_SAC
+reward_weight_safety,0.1,weight,Weight_for_safety_constraints_in_reward_function,DDPG_SAC
+max_episode_steps,1000.0,steps,Maximum_steps_per_episode,DDPG_SAC
+target_speed_kmh,60.0,km_per_h,Target_cruising_speed,DDPG_SAC
+battery_soc_min,10.0,percent,Minimum_allowed_battery_SOC,DDPG_SAC
+battery_soc_max,100.0,percent,Maximum_battery_SOC,DDPG_SAC
+motor_temp_max,80.0,celsius,Maximum_allowed_motor_temperature,DDPG_SAC
+battery_temp_max,40.0,celsius,Maximum_allowed_battery_temperature,DDPG_SAC

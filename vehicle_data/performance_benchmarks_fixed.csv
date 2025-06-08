@@ -1,0 +1,5 @@
+driving_mode,avg_soc_decrease_percent,speed_tracking_rate_percent,target_speed_proximity,energy_efficiency_kmkwh,safety_violations_per_100km,comfort_score,notes
+Cruise_Mode,18.5,84,0.8,4.2,0,8.5,Constant_speed_driving_baseline
+DDPG_Target,11.5,89,0.88,4.8,0,7.8,DDPG_algorithm_performance_target
+SAC_Target,11.0,91,0.9,4.9,0,8.2,SAC_algorithm_performance_target_better_stability_expected
+Human_Driver_Average,16.0,78,0.75,4.0,2,7.0,Average_human_driver_performance_for_comparison

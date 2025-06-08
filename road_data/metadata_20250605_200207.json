@@ -1,0 +1,20 @@
+{
+  "collection_date": "2025-06-05T20:02:07.675619",
+  "start_point": [
+    37.5144,
+    127.0206
+  ],
+  "end_point": [
+    37.5103,
+    127.0219
+  ],
+  "total_points": 10,
+  "total_segments": 9,
+  "api_used": "Google Elevation API",
+  "gradient_stats": {
+    "mean": -1.9637879265679237,
+    "max": 6.416152954101556,
+    "min": -5.933879852294922,
+    "std": 4.523290734367701
+  }
+}

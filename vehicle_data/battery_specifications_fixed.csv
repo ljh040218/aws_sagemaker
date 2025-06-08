@@ -1,0 +1,10 @@
+trim,parameter,value,unit,source,manufacturer,chemistry,cell_type
+Long_Range_2WD,pack_capacity_kwh,84.0,kWh,Hyundai_Official,SK_ON,NCM,Pouch
+Long_Range_AWD,pack_capacity_kwh,84.0,kWh,Hyundai_Official,SK_ON,NCM,Pouch
+Standard_2WD,pack_capacity_kwh,63.0,kWh,Hyundai_Official,SK_ON,NCM,Pouch
+Long_Range_2WD,usable_capacity_kwh,77.4,kWh,Historical_Data,SK_ON,NCM,Pouch
+Long_Range_AWD,usable_capacity_kwh,77.4,kWh,Historical_Data,SK_ON,NCM,Pouch
+Standard_2WD,usable_capacity_kwh,58.0,kWh,Historical_Data,SK_ON,NCM,Pouch
+Long_Range_2WD,nominal_voltage_v,697.0,V,Hyundai_Official,SK_ON,NCM,Pouch
+Long_Range_AWD,nominal_voltage_v,697.0,V,Hyundai_Official,SK_ON,NCM,Pouch
+Standard_2WD,nominal_voltage_v,523.0,V,Hyundai_Official,SK_ON,NCM,Pouch

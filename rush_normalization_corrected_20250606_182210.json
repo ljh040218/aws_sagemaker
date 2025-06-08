@@ -1,0 +1,32 @@
+{
+  "morning_rush": {
+    "traffic_volume": {
+      "min": 1446,
+      "max": 1764
+    }
+  },
+  "evening_rush": {
+    "traffic_volume": {
+      "min": 1896,
+      "max": 2130
+    }
+  },
+  "weather": {
+    "temperature": {
+      "min": -17.2,
+      "max": 35.8
+    },
+    "humidity": {
+      "min": 15.0,
+      "max": 100.0
+    },
+    "wind_speed": {
+      "min": 0.0,
+      "max": 8.1
+    },
+    "precipitation": {
+      "min": 0.0,
+      "max": 34.7
+    }
+  }
+}

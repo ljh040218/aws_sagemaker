@@ -1,0 +1,10 @@
+parameter,value,unit,source,reliability
+length_mm,4635.0,mm,Carnoon_Official,High
+width_mm,1890.0,mm,Carnoon_Official,High
+height_mm,1605.0,mm,Carnoon_Official,High
+wheelbase_mm,3000.0,mm,Carnoon_Official,High
+drag_coefficient,0.288,Cd,Hyundai_Official,Very_High
+tire_radius_m,0.381,m,Calculated,High
+frontal_area_m2,2.8,m2,Estimated,Medium
+estimated_mass_kg,2200.0,kg,Estimated,Medium
+gear_ratio,8.552,ratio,Estimated,Medium
