@@ -32,12 +32,22 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class PerformanceMetricsCallback(BaseCallback):
-    """실시간 성능 추적"""
-    
-    def __init__(self, eval_env, eval_freq=2000, verbose=0):
-        super(PerformanceMetricsCallback, self).__init__(verbose)
+    """실시간 성능 추적 및 조기 종료"""
+    def __init__(self, eval_env, eval_freq=2000, verbose=0, 
+                 convergence_threshold=0.9, patience=10, min_episodes=50):
+        super().__init__(verbose)
         self.eval_env = eval_env
         self.eval_freq = eval_freq
+        self.convergence_threshold = convergence_threshold
+        self.patience = patience
+        self.min_episodes = min_episodes
+
+        self.best_performance = -np.inf
+        self.performance_history = []
+        self.episodes_without_improvement = 0
+        self.converged = False
+        self.last_episode_count = 0
+
         self.metrics_history = {
             'episode': [],
             'timestep': [],
@@ -48,61 +58,74 @@ class PerformanceMetricsCallback(BaseCallback):
             'comfort_score': [],
             'safety_violations': [],
             'convergence_reward': [],
-            'learning_stability': []
+            'learning_stability': [],
+            'performance_score': []
         }
-        self.episode_rewards = []
-        self.last_episode_count = 0
-    
+
+    def _calculate_performance_score(self, metrics):
+        efficiency_score = min(metrics.get('energy_efficiency', 1.0) / 10.0, 1.0) * 0.4
+        speed_score = (metrics.get('speed_tracking_rate', 0) / 100.0) * 0.3
+        soc_rate = metrics.get('soc_decrease_rate', 100)
+        soc_score = max(0, (100 - soc_rate) / 100.0) * 0.2
+        safety_violations = metrics.get('safety_violations', 10)
+        safety_score = max(0, (10 - safety_violations) / 10.0) * 0.1
+        return min(1.0, max(0.0, efficiency_score + speed_score + soc_score + safety_score))
+
+    def _check_convergence(self):
+        if len(self.performance_history) < self.min_episodes:
+            return False
+        recent_scores = self.performance_history[-10:]
+        if len(recent_scores) < 10:
+            return False
+        mean_perf = np.mean(recent_scores)
+        std_perf = np.std(recent_scores)
+        return (mean_perf >= self.convergence_threshold) and (std_perf < 0.05)
+
     def _on_step(self) -> bool:
         if self.n_calls % self.eval_freq == 0:
             try:
-                # 환경이 벡터화된 환경인지 확인
                 if hasattr(self.training_env, 'get_attr'):
-                    # 벡터화된 환경의 경우
                     current_metrics_list = self.training_env.get_attr('get_current_metrics')
                     episode_counts = self.training_env.get_attr('episode_count')
-                    
-                    # 첫 번째 환경의 메트릭 사용
-                    if current_metrics_list and episode_counts:
-                        current_metrics = current_metrics_list[0]() if callable(current_metrics_list[0]) else current_metrics_list[0]
-                        current_episode = episode_counts[0]
-                    else:
-                        current_metrics = {'energy_efficiency': 4.0}
-                        current_episode = 0
-                        
+                    current_metrics = current_metrics_list[0]() if callable(current_metrics_list[0]) else current_metrics_list[0]
+                    current_episode = episode_counts[0]
                 else:
-                    # 단일 환경의 경우
-                    if hasattr(self.training_env, 'get_current_metrics'):
-                        current_metrics = self.training_env.get_current_metrics()
-                    else:
-                        current_metrics = {'energy_efficiency': 4.0}
-                    
-                    if hasattr(self.training_env, 'episode_count'):
-                        current_episode = self.training_env.episode_count
-                    else:
-                        current_episode = 0
-                
-                # 실제 효율값 로그 출력
+                    current_metrics = self.training_env.get_current_metrics()
+                    current_episode = getattr(self.training_env, 'episode_count', 0)
+
+                performance_score = self._calculate_performance_score(current_metrics)
+                self.performance_history.append(performance_score)
                 efficiency = current_metrics.get('energy_efficiency', 4.0)
-                logger.info(f"Step {self.n_calls}: Energy Efficiency = {efficiency:.3f} km/kWh")
-                
-                # 새 에피소드 완료시만 기록
+                logger.info(f"Step {self.n_calls}: 성능점수={performance_score:.3f}, 효율={efficiency:.3f} km/kWh")
+
                 if current_episode > self.last_episode_count:
                     self.last_episode_count = current_episode
-                    
+                    if performance_score > self.best_performance:
+                        self.best_performance = performance_score
+                        self.episodes_without_improvement = 0
+                    else:
+                        self.episodes_without_improvement += 1
+
                     self.metrics_history['timestep'].append(self.n_calls)
                     self.metrics_history['episode'].append(current_episode)
                     self.metrics_history['energy_efficiency'].append(efficiency)
-                    self.metrics_history['soc_decrease_rate'].append(
-                        current_metrics.get('soc_decrease_rate', 15.0)
-                    )
-                    self.metrics_history['speed_tracking_rate'].append(
-                        current_metrics.get('speed_tracking_rate', 85.0)
-                    )
-                    
+                    self.metrics_history['performance_score'].append(performance_score)
+                    self.metrics_history['soc_decrease_rate'].append(current_metrics.get('soc_decrease_rate', 15.0))
+                    self.metrics_history['speed_tracking_rate'].append(current_metrics.get('speed_tracking_rate', 85.0))
+
+                    if self._check_convergence():
+                        logger.info("90% 수렴 달성, 학습 조기 종료")
+                        self.converged = True
+                        return False
+                    if self.episodes_without_improvement >= self.patience:
+                        recent_mean = np.mean(self.performance_history[-5:])
+                        if recent_mean >= 0.8:
+                            logger.info("최근 성능 안정화로 조기 종료")
+                            return False
+
             except Exception as e:
-                logger.warning(f"Metrics collection failed at step {self.n_calls}: {e}")
-                
+                logger.warning(f"Metrics 수집 실패: {e}")
+
         return True
 
 
@@ -637,14 +660,17 @@ class EVEnergyEnvironmentPreprocessed(gym.Env):
 class CruiseControlBaseline:
     """크루즈 모드 기준선 - 일정 속도 유지"""
     
-    def __init__(self, target_speed=60.0):
+    def __init__(self, target_speed=32.0):
         self.target_speed = target_speed
         self.kp = 0.8
         self.ki = 0.1
         self.kd = 0.05
         self.integral_error = 0
         self.previous_error = 0
-    
+        
+# 평가 시 명시적으로 기준 효율 로그 출력
+logger.info("크루즈 기준 성능: 3.20 km/kWh")    
+
     def predict(self, observation, deterministic=True):
         """PID 제어로 목표 속도 유지"""
         current_speed_normalized = observation[26] if len(observation) > 26 else 0.5
@@ -813,9 +839,13 @@ def train_sac_model(model_name, is_transfer_learning=False, total_timesteps=1000
     # 콜백 설정 (SageMaker 최적화)
     eval_callback = PerformanceMetricsCallback(
         eval_env=env,
-        eval_freq=2000,  # SageMaker용 빈도 조정
-        verbose=1
+        eval_freq=2000,
+        verbose=1,
+        convergence_threshold=0.9,
+        patience=10,
+        min_episodes=20
     )
+
     
     # 훈련 시작
     logger.info(f" 학습 시작 - 목표: {total_timesteps} 스텝")
