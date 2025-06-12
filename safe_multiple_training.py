@@ -1,5 +1,3 @@
-# 안전한 3번 반복 학습 코드 + 학습 과정 데이터 저장
-
 import gc
 import torch
 import numpy as np
@@ -9,11 +7,17 @@ import os
 import json
 import logging
 import pickle
-from stable_baselines3 import SAC
 from stable_baselines3.common.callbacks import BaseCallback
-import gym 
-from gym import spaces 
-from transfer_utils import transfer_weights 
+
+# 기존 임포트 다음에 추가  
+import warnings
+warnings.filterwarnings('ignore')
+
+# shimmy 임포트 (설치 확인용)
+try:
+    import shimmy
+except ImportError:
+    print("shimmy 설치 필요: pip install shimmy")
 
 # 기존 모듈들 임포트
 from sagemaker_training import (
@@ -307,11 +311,11 @@ class EnhancedSafeMultipleTraining:
 
     def train_sac_model_with_logging(self, model_name, is_transfer_learning=False, 
                                    total_timesteps=100000, transfer_type="lunarlander"):
-        """학습 과정 로깅이 포함된 SAC 모델 훈련"""
+        """학습 과정 로깅이 포함된 SAC 모델 훈련 - 30배 증강 데이터 우선 사용"""
         
-        logger.info(f"{model_name} 훈련 시작 (로깅 포함)")
+        logger.info(f"🤖 {model_name} 훈련 시작 (30배 증강 데이터 우선)")
         
-        # 환경 생성
+        # 환경 생성 (30배 증강 데이터 자동 탐지)
         env = EVEnergyEnvironmentPreprocessed(data_dir=self.data_dir)
         eval_env = EVEnergyEnvironmentPreprocessed(data_dir=self.data_dir)
         
@@ -322,14 +326,15 @@ class EnhancedSafeMultipleTraining:
             verbose=1
         )
         
-        # SAC 모델 생성 (기존 train_sac_model 로직 통합)
+        # SAC 모델 생성
         from stable_baselines3 import SAC
         import torch
         
+        # 30배 증강 데이터에 최적화된 SAC 설정
         sac_config = {
             'learning_rate': 3e-4,
-            'buffer_size': 100000,
-            'batch_size': 256,
+            'buffer_size': 50000,   
+            'batch_size': 256,      
             'tau': 0.005,
             'gamma': 0.99,
             'train_freq': 1,
@@ -376,7 +381,7 @@ class EnhancedSafeMultipleTraining:
                 logger.warning(f" 전이학습 실패: {e}, 순수학습으로 진행")
                 model = SAC('MlpPolicy', env, **sac_config)
         else:
-            logger.info("🆕 순수학습 모델 생성")
+            logger.info("순수학습 모델 생성")
             model = SAC('MlpPolicy', env, **sac_config)
         
         # 훈련 시작
@@ -404,12 +409,12 @@ class EnhancedSafeMultipleTraining:
         # 최종 성능 평가
         from stable_baselines3.common.evaluation import evaluate_policy
         eval_results, eval_episodes = evaluate_policy(
-            model, eval_env, n_eval_episodes=30, return_episode_rewards=True
+            model, eval_env, n_eval_episodes=50, return_episode_rewards=True
         )
         
         # 메트릭 수집
         final_metrics = []
-        for _ in range(30):
+        for _ in range(50):
             obs, _ = eval_env.reset()
             done = False
             while not done:
@@ -425,6 +430,7 @@ class EnhancedSafeMultipleTraining:
             'transfer_type': transfer_type if is_transfer_learning else None,
             'training_time': training_time,
             'total_timesteps': total_timesteps,
+            'data_augmentation': '30x_statistically_valid',
             'eval_mean_reward': np.mean(eval_results),
             'eval_std_reward': np.std(eval_results),
             'metrics': {
@@ -451,13 +457,13 @@ class EnhancedSafeMultipleTraining:
         with open(learning_curve_path, 'wb') as f:
             pickle.dump(learning_callback.learning_data, f)
         
-        logger.info(f"💾 모델 저장: {model_path}")
+        logger.info(f"모델 저장: {model_path}")
         logger.info(f" 학습 곡선 저장: {learning_curve_path}")
         
         return model, results, learning_callback.learning_data
 
     def run_sac_scratch_multiple(self):
-        logger.info(f"🤖 SAC 순수학습 {self.num_runs}회 실행 시작")
+        logger.info(f"SAC 순수학습 {self.num_runs}회 실행 시작")
 
         scratch_results = []
         scratch_learning_curves = []
