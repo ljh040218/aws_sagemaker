@@ -24,7 +24,7 @@ try:
     SHIMMY_AVAILABLE = True
 except ImportError:
     SHIMMY_AVAILABLE = False
-    print("⚠️ shimmy가 설치되지 않음 - pip install shimmy 실행 필요")
+    print("shimmy가 설치되지 않음 - pip install shimmy 실행 필요")
     
 
 # 로깅 설정
