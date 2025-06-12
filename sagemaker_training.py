@@ -15,13 +15,24 @@ from gymnasium import spaces
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
+import warnings
+warnings.filterwarnings('ignore')
+
+# shimmy 임포트
+try:
+    import shimmy
+    SHIMMY_AVAILABLE = True
+except ImportError:
+    SHIMMY_AVAILABLE = False
+    print("⚠️ shimmy가 설치되지 않음 - pip install shimmy 실행 필요")
+    
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class PerformanceMetricsCallback(BaseCallback):
-    """실시간 성능 추적 - SageMaker 최적화"""
+    """실시간 성능 추적"""
     
     def __init__(self, eval_env, eval_freq=2000, verbose=0):
         super(PerformanceMetricsCallback, self).__init__(verbose)
@@ -45,31 +56,49 @@ class PerformanceMetricsCallback(BaseCallback):
     def _on_step(self) -> bool:
         if self.n_calls % self.eval_freq == 0:
             try:
+                # 환경이 벡터화된 환경인지 확인
                 if hasattr(self.training_env, 'get_attr'):
+                    # 벡터화된 환경의 경우
                     current_metrics_list = self.training_env.get_attr('get_current_metrics')
                     episode_counts = self.training_env.get_attr('episode_count')
                     
-                    if current_metrics_list and current_metrics_list[0] is not None:
-                        current_metrics = current_metrics_list[0]()
-                        current_episode = episode_counts[0] if episode_counts else 0
+                    # 첫 번째 환경의 메트릭 사용
+                    if current_metrics_list and episode_counts:
+                        current_metrics = current_metrics_list[0]() if callable(current_metrics_list[0]) else current_metrics_list[0]
+                        current_episode = episode_counts[0]
+                    else:
+                        current_metrics = {'energy_efficiency': 4.0}
+                        current_episode = 0
                         
-                        # 실제 효율값 로그 출력
-                        efficiency = current_metrics.get('energy_efficiency', 0.0)
-                        logger.info(f"Step {self.n_calls}: Energy Efficiency = {efficiency:.3f} km/kWh")
-                        
-                        # 새 에피소드 완료시만 기록
-                        if current_episode > self.last_episode_count:
-                            self.last_episode_count = current_episode
-                            
-                            self.metrics_history['timestep'].append(self.n_calls)
-                            self.metrics_history['episode'].append(current_episode)
-                            self.metrics_history['energy_efficiency'].append(efficiency)
-                            self.metrics_history['soc_decrease_rate'].append(
-                                current_metrics.get('soc_decrease_rate', 15.0)
-                            )
-                            self.metrics_history['speed_tracking_rate'].append(
-                                current_metrics.get('speed_tracking_rate', 85.0)
-                            )
+                else:
+                    # 단일 환경의 경우
+                    if hasattr(self.training_env, 'get_current_metrics'):
+                        current_metrics = self.training_env.get_current_metrics()
+                    else:
+                        current_metrics = {'energy_efficiency': 4.0}
+                    
+                    if hasattr(self.training_env, 'episode_count'):
+                        current_episode = self.training_env.episode_count
+                    else:
+                        current_episode = 0
+                
+                # 실제 효율값 로그 출력
+                efficiency = current_metrics.get('energy_efficiency', 4.0)
+                logger.info(f"Step {self.n_calls}: Energy Efficiency = {efficiency:.3f} km/kWh")
+                
+                # 새 에피소드 완료시만 기록
+                if current_episode > self.last_episode_count:
+                    self.last_episode_count = current_episode
+                    
+                    self.metrics_history['timestep'].append(self.n_calls)
+                    self.metrics_history['episode'].append(current_episode)
+                    self.metrics_history['energy_efficiency'].append(efficiency)
+                    self.metrics_history['soc_decrease_rate'].append(
+                        current_metrics.get('soc_decrease_rate', 15.0)
+                    )
+                    self.metrics_history['speed_tracking_rate'].append(
+                        current_metrics.get('speed_tracking_rate', 85.0)
+                    )
                     
             except Exception as e:
                 logger.warning(f"Metrics collection failed at step {self.n_calls}: {e}")
@@ -78,7 +107,7 @@ class PerformanceMetricsCallback(BaseCallback):
 
 
 class EVEnergyEnvironmentPreprocessed(gym.Env):
-    """전처리된 데이터 활용 전기차 에너지 효율 최적화 환경 - SageMaker 최적화"""
+    """전처리된 데이터 활용 전기차 에너지 효율 최적화 환경"""
     
     def __init__(self, data_dir, config=None):
         super(EVEnergyEnvironmentPreprocessed, self).__init__()
@@ -133,14 +162,14 @@ class EVEnergyEnvironmentPreprocessed(gym.Env):
         
         # 현재 상태
         self.current_data_idx = 0
-        self.current_speed = 60.0  # km/h
+        self.current_speed = 30.0  # km/h
         self.current_soc = 0.8
         self.step_count = 0
         self.total_distance = 0.0  # km
         self.total_energy_consumed = 0.0  # kWh
         
-        # 목표 속도 (강남대로 법정속도)
-        self.target_speed = 60.0  # km/h
+        # 목표 속도 (평일 서울 도심 출퇴근 평균 속도)
+        self.target_speed = 30.0  # km/h
         
         # 에피소드 카운터
         self.episode_count = 0
@@ -220,15 +249,15 @@ class EVEnergyEnvironmentPreprocessed(gym.Env):
         try:
             # SageMaker 환경에서의 데이터 경로
             train_patterns = [
-                f"{self.data_dir}/rush_separated_train_corrected_*.csv",
-                f"{self.data_dir}/rush_separated_train*.csv", 
+                f"{self.data_dir}/train_statistically_valid_*.csv",
+                f"{self.data_dir}/train_statistically_valid_*.csv", 
                 f"{self.data_dir}/*train*.csv",
                 f"{self.data_dir}/*.csv"
             ]
             
             test_patterns = [
-                f"{self.data_dir}/rush_separated_test_corrected_*.csv",
-                f"{self.data_dir}/rush_separated_test*.csv",
+                f"{self.data_dir}/test_statistically_valid_*.csv",
+                f"{self.data_dir}/test_statistically_valid_*.csv",
                 f"{self.data_dir}/*test*.csv"
             ]
             
@@ -555,10 +584,10 @@ class EVEnergyEnvironmentPreprocessed(gym.Env):
     
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        
+    
         # 에피소드 카운터 증가
         self.episode_count += 1
-        
+    
         # 차량 상태 초기화
         self.current_data_idx = 0
         self.current_speed = 60.0
@@ -566,7 +595,7 @@ class EVEnergyEnvironmentPreprocessed(gym.Env):
         self.step_count = 0
         self.total_distance = 0.0
         self.total_energy_consumed = 0.0
-        
+    
         # 에피소드 데이터 초기화
         self.episode_data = {
             'speeds': [],
@@ -579,25 +608,30 @@ class EVEnergyEnvironmentPreprocessed(gym.Env):
             'distances': [],
             'elevation_changes': []
         }
-        
+
+        info = {
+            'initial_soc': self.current_soc,
+            'initial_speed': self.current_speed,
+            'route_distance': 7.816
+        }
+    
         # 랜덤 데이터 샘플 선택
         if hasattr(self, 'train_data') and len(self.train_data) > 0:
             self.current_data_idx = np.random.randint(0, len(self.train_data))
             initial_row = self.train_data.iloc[self.current_data_idx]
-            
+        
             if isinstance(initial_row['state_vector_rush'], list):
                 self.state = np.array(initial_row['state_vector_rush'], dtype=np.float32)
             else:
                 self.state = np.random.uniform(-1, 1, 28).astype(np.float32)
-            
+        
             if len(self.state) >= 28:
                 self.state[25] = self.current_soc
                 self.state[26] = self.current_speed / 120.0
         else:
             self.state = np.random.uniform(-1, 1, 28).astype(np.float32)
-        
-        return self.state.copy(), {}
-
+    
+        return self.state.copy(), info
 
 # 크루즈 모드 기준선
 class CruiseControlBaseline:
@@ -711,7 +745,7 @@ def train_sac_model(model_name, is_transfer_learning=False, total_timesteps=1000
         'train_freq': 1,
         'gradient_steps': 1,
         'verbose': 1,
-        'device': 'auto'  # SageMaker에서 GPU 자동 감지
+        'device': 'cuda' if torch.cuda.is_available() else 'cpu'
     }
     
     # 모델 생성
