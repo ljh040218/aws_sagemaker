@@ -1,4 +1,33 @@
-# 1. PerformanceMetricsCallback 클래스 수정 - 수렴 검사 기능 추가
+import gc
+import torch
+import numpy as np
+import random
+from datetime import datetime
+import os
+import json
+import logging
+import pickle
+from stable_baselines3.common.callbacks import BaseCallback
+
+# 기존 임포트 다음에 추가  
+import warnings
+warnings.filterwarnings('ignore')
+
+# shimmy 임포트 (설치 확인용)
+try:
+    import shimmy
+except ImportError:
+    print("shimmy 설치 필요: pip install shimmy")
+
+# 기존 모듈들 임포트
+from sagemaker_training import (
+    EVEnergyEnvironmentPreprocessed,
+    train_sac_model,
+    evaluate_cruise_baseline
+)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class PerformanceMetricsCallback(BaseCallback):
     """실시간 성능 추적 및 조기 종료"""
